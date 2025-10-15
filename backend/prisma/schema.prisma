@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  password_hash String?
+  name          String?
+  avatar_url    String?
+  created_at    DateTime @default(now())
+
+  // Stripe Connect
+  stripeAccountId String? @unique
+
+  // OAuth tokens (Spotify)
+  spotifyAccessToken  String?
+  spotifyRefreshToken String?
+  spotifyExpiresAt    DateTime?
+
+  subscriptions Subscription[]     @relation("OwnerSubscriptions")
+  memberOf      SubscriptionUser[]
+}
+
+model Subscription {
+  id            Int      @id @default(autoincrement())
+  ownerId       Int
+  owner         User     @relation("OwnerSubscriptions", fields: [ownerId], references: [id])
+  service_name  String
+  plan_name     String
+  price         Float
+  currency      String   @default("xaf")
+  max_users     Int
+  current_users Int      @default(1)
+  description   String?
+  status        String   @default("active")
+  created_at    DateTime @default(now())
+
+  users SubscriptionUser[]
+}
+
+model SubscriptionUser {
+  id             Int          @id @default(autoincrement())
+  payments       Payment[]
+  subscriptionId Int
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  userId         Int
+  user           User         @relation(fields: [userId], references: [id])
+  joined_at      DateTime     @default(now())
+  role           String       @default("member")
+}
+
+model Payment {
+  id                 Int              @id @default(autoincrement())
+  subscriptionUserId Int
+  subscriptionUser   SubscriptionUser @relation(fields: [subscriptionUserId], references: [id])
+  amount             Float
+  currency           String           @default("xaf")
+  stripePaymentId    String?
+  stripeSessionId    String?
+  status             String           @default("pending")
+  created_at         DateTime         @default(now())
+}
