@@ -14,8 +14,8 @@ export const authMiddleware = (
 ) => {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader) {
-        return res.status(401).json({ message: 'Token manquant' });
+    if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Token manquant ou invalide' });
     }
 
     const parts = authHeader.split(' ');
@@ -23,7 +23,7 @@ export const authMiddleware = (
         return res.status(401).json({ message: 'Token malformé' });
     }
 
-    const token = parts[1]; // TypeScript sait maintenant que c'est un string
+    const token = parts[1].trim(); // TypeScript sait maintenant que c'est un string
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as unknown;
