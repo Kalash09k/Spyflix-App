@@ -1,8 +1,0 @@
-{
-  "files": [],
-  "references": [
-    { "path": "../vite/tsconfig.app.json" },
-    { "path": "../vite/tsconfig.node.json" }
-  ],
-  "include": ["src", "vite-env.d.ts"]
-}

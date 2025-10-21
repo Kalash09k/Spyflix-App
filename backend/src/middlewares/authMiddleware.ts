@@ -10,8 +10,7 @@ export interface AuthenticatedRequest extends Request {
 export const authMiddleware = (
     req: AuthenticatedRequest,
     res: Response,
-    next: NextFunction
-) => {
+    next: NextFunction) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
@@ -26,6 +25,10 @@ export const authMiddleware = (
     const token = parts[1].trim(); // TypeScript sait maintenant que c'est un string
 
     try {
+        const payload: any = jwt.verify(token, JWT_SECRET);
+        (req as any).userId = payload.userId;
+        next();
+        
         const decoded = jwt.verify(token, JWT_SECRET) as unknown;
 
         if (typeof decoded === 'object' && decoded !== null && 'userId' in decoded) {

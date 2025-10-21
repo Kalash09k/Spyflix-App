@@ -2,9 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+
 import authRoutes from '../src/routes/authRoutes.ts';
 import { authMiddleware } from './middlewares/authMiddleware.ts';
 import subscriptionRoutes from '../src/routes/subscriptionRoutes.ts';
+import cinetpayRoutes from '../src/routes/cinetpayRoutes.ts';
 
 dotenv.config();
 
@@ -16,6 +18,7 @@ app.use(bodyParser.json());
 app.use(express.json());
 
 // Routes
+app.use('/api/payments', cinetpayRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 
