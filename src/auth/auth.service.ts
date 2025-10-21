@@ -28,7 +28,11 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email
+      }
+    });
     if (!user) throw new Error('Utilisateur non trouvé');
 
     const valid = await bcrypt.compare(password, user.password);

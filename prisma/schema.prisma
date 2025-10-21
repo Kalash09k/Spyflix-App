@@ -22,18 +22,25 @@ model User {
 }
 
 model SubscriptionGroup {
-  id     Int               @id @default(autoincrement())
-  name   String
-  type   SubscriptionType?
-  userId Int?
-  user   User?             @relation(fields: [userId], references: [id])
+  id             String   @id @default(uuid())
+  ownerId        Int
+  owner          User     @relation(fields: [ownerId], references: [id])
+  serviceName    String
+  plan           String
+  pricePerSlot   Float
+  totalSlots     Int
+  availableSlots Int
+  createdAt      DateTime @default(now())
+  orders         Order[]
 }
 
 model Order {
-  id     Int   @id @default(autoincrement())
-  amount Float
-  userId Int?
-  user   User? @relation(fields: [userId], references: [id])
+  id                  Int                @id @default(autoincrement())
+  amount              Float
+  userId              Int?
+  user                User?              @relation(fields: [userId], references: [id])
+  SubscriptionGroup   SubscriptionGroup? @relation(fields: [subscriptionGroupId], references: [id])
+  subscriptionGroupId String?
 }
 
 enum Role {
