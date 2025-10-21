@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int                 @id @default(autoincrement())
+  name          String
+  email         String              @unique
+  phone         String
+  password      String
+  role          Role
+  kycStatus     KYCStatus           @default(PENDING)
+  wallet        Float               @default(0)
+  createdAt     DateTime            @default(now())
+  orders        Order[]
+  subscriptions SubscriptionGroup[]
+}
+
+model SubscriptionGroup {
+  id     Int               @id @default(autoincrement())
+  name   String
+  type   SubscriptionType?
+  userId Int?
+  user   User?             @relation(fields: [userId], references: [id])
+}
+
+model Order {
+  id     Int   @id @default(autoincrement())
+  amount Float
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  OWNER
+  BUYER
+}
+
+enum SubscriptionType {
+  BASIC
+  PREMIUM
+}
+
+enum KYCStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
