@@ -1,46 +1,55 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient();
 
 @Injectable()
 export class AuthService {
-  async register(data: {
-    name: string;
-    email: string;
-    phone: string;
-    password: string;
-    role: 'OWNER' | 'BUYER';
-  }) {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = await prisma.user.create({
+  constructor(private prisma: PrismaService) {}
+
+  async register(dto: any) {
+    const exists = await this.prisma.user.findUnique({ where: { email: dto.email }});
+    if (exists) throw new ConflictException('Un compte existe deja avec cet Email');
+
+    const hashed = await bcrypt.hash(dto.password, 12);
+    const user = await this.prisma.user.create({
       data: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        password: hashedPassword,
-        role: data.role,
+        name: dto.name,
+        email: dto.email,
+        phone: dto.phone,
+        password: hashed,
+        role: dto.role,
       },
     });
-    return user;
+    // ne renvoie pas le mot de passe
+    const { password, ...rest } = user as any;
+    return rest;
   }
 
-  async login(email: string, password: string) {
-    const user = await prisma.user.findUnique({
-      where: {
-        email: email
-      }
-    });
-    if (!user) throw new Error('Utilisateur non trouvé');
+  async login(dto: { email: string; password: string }) {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email }});
+    if (!user) throw new UnauthorizedException('Identifiants invalides');
+    const ok = await bcrypt.compare(dto.password, user.password);
+    if (!ok) throw new UnauthorizedException('Identifiants invalides');
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new Error('Mot de passe incorrect');
+    const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const { password, ...rest } = user as any;
+    return { user: rest, token };
+  }
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, {
-      expiresIn: '7d',
+  // KYC upload (simple: store url and mark PENDING)
+  async uploadKyc(userId: string, documentUrl: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { kycStatus: 'PENDING' }, // stocker document dans S3 puis admin valide via dashboard
     });
-    return { user, token };
+  }
+
+  // Admin function to set KYC
+  async setKycStatus(userId: string, status: 'VERIFIED' | 'REJECTED') {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { kycStatus: status },
+    });
   }
 }

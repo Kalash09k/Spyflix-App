@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id            Int                 @id @default(autoincrement())
+  id            String              @id @default(uuid())
   name          String
   email         String              @unique
   phone         String
@@ -17,14 +17,27 @@ model User {
   kycStatus     KYCStatus           @default(PENDING)
   wallet        Float               @default(0)
   createdAt     DateTime            @default(now())
-  orders        Order[]
-  subscriptions SubscriptionGroup[]
+  subscriptions SubscriptionGroup[] @relation("ownerGroups")
+  orders        Order[]             @relation("buyerOrders")
+  ownerOrders   Order[]             @relation("ownerOrders")
+  transactions  Transaction[]
+}
+
+enum Role {
+  OWNER
+  BUYER
+}
+
+enum KYCStatus {
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
 model SubscriptionGroup {
   id             String   @id @default(uuid())
-  ownerId        Int
-  owner          User     @relation(fields: [ownerId], references: [id])
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], name: "ownerGroups")
   serviceName    String
   plan           String
   pricePerSlot   Float
@@ -35,26 +48,50 @@ model SubscriptionGroup {
 }
 
 model Order {
-  id                  Int                @id @default(autoincrement())
+  id                  String            @id @default(uuid())
+  subscriptionGroupId String
+  subscriptionGroup   SubscriptionGroup @relation(fields: [subscriptionGroupId], references: [id])
+  buyerId             String
+  buyer               User              @relation(fields: [buyerId], references: [id], name: "buyerOrders")
+  ownerId             String
+  owner               User              @relation(fields: [ownerId], references: [id], name: "ownerOrders")
   amount              Float
-  userId              Int?
-  user                User?              @relation(fields: [userId], references: [id])
-  SubscriptionGroup   SubscriptionGroup? @relation(fields: [subscriptionGroupId], references: [id])
-  subscriptionGroupId String?
+  commission          Float             @default(0)
+  status              OrderStatus       @default(PENDING)
+  buyerWhatsApp       String?
+  buyerWhatsAppLink   String?
+  paymentProviderId   String?
+  expiresAt           DateTime
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  Transaction         Transaction[]
+
+  @@index([status, expiresAt])
 }
 
-enum Role {
-  OWNER
-  BUYER
-}
-
-enum SubscriptionType {
-  BASIC
-  PREMIUM
-}
-
-enum KYCStatus {
+enum OrderStatus {
   PENDING
-  VERIFIED
-  REJECTED
+  PAID
+  CONFIRMED
+  REFUNDED
+  CANCELLED
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  orderId   String?
+  order     Order?          @relation(fields: [orderId], references: [id])
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  type      TransactionType
+  amount    Float
+  metadata  Json?
+  createdAt DateTime        @default(now())
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+  COMMISSION
 }

@@ -1,37 +1,26 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private authService: AuthService) { }
+  constructor(private auth: AuthService) {}
 
-    @Post('register')
-    async register(
-        @Body() body: { name: string; email: string; phone: string; password: string; role: 'OWNER' | 'BUYER' },
-    ) {
-        return this.authService.register(body);
-    }
+  @Post('register')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async register(@Body() dto: RegisterDto) {
+    return this.auth.register(dto);
+  }
 
-    @Post('login')
-    async login(@Body() body: { email: string; password: string }) {
-        return this.authService.login(body.email, body.password);
-    }
+  @Post('login')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async login(@Body() dto: LoginDto) {
+    return this.auth.login(dto);
+  }
 
-    @Post('kyc')
-    async uploadKYC(@Body() body: { userId: string; documentUrl: string }) {
-        const userIdAsNumber = parseInt(body.userId, 10);
-        if (isNaN(userIdAsNumber)) {
-            // Dans un vrai projet NestJS, vous utiliseriez une exception HTTP (ex: NotFoundException)
-            throw new Error('Invalid user ID format'); 
-        }
-        // stocker document dans AWS S3 ou local
-        return prisma.user.update({
-            where: { id: userIdAsNumber },
-            data: { kycStatus: 'PENDING' },
-        });
-    }
-
+  @Post('kyc')
+  async uploadKyc(@Body() body: { userId: string; documentUrl: string }) {
+    return this.auth.uploadKyc(body.userId, body.documentUrl);
+  }
 }

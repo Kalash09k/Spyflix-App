@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class SubscriptionsService {
-  // Créer un groupe d'abonnement
+  constructor(private prisma: PrismaService) {}
+
   async createGroup(data: {
     ownerId: string;
     serviceName: string;
@@ -13,17 +12,9 @@ export class SubscriptionsService {
     pricePerSlot: number;
     totalSlots: number;
   }) {
-
-    const ownerIdAsNumber = parseInt(data.ownerId, 10);
-
-    if (isNaN(ownerIdAsNumber)) {
-      // Gérer l'erreur, par exemple, jeter une exception
-      throw new Error("L'identifiant du propriétaire (ownerId) n'est pas un nombre valide.");
-  }
-
-    const group = await prisma.subscriptionGroup.create({
+    const group = await this.prisma.subscriptionGroup.create({
       data: {
-        ownerId: ownerIdAsNumber,
+        ownerId: data.ownerId,
         serviceName: data.serviceName,
         plan: data.plan,
         pricePerSlot: data.pricePerSlot,
@@ -34,28 +25,22 @@ export class SubscriptionsService {
     return group;
   }
 
-  // Récupérer tous les groupes disponibles pour un service
-  async searchGroups(serviceName: string) {
-    const groups = await prisma.subscriptionGroup.findMany({
+  async search(serviceQuery: string) {
+    return this.prisma.subscriptionGroup.findMany({
       where: {
         serviceName: {
-          contains: serviceName,
+          contains: serviceQuery,
           mode: 'insensitive',
         },
         availableSlots: { gt: 0 },
       },
-      include: {
-        owner: true, // On peut afficher infos du propriétaire si nécessaire
-      },
+      include: { owner: { select: { id: true, name: true, phone: true, kycStatus: true } } },
     });
-    return groups;
   }
 
-  // Récupérer un groupe par ID
-  async getGroupById(id: string) {
-    return prisma.subscriptionGroup.findUnique({
-      where: { id },
-      include: { owner: true },
-    });
+  async getById(id: string) {
+    const group = await this.prisma.subscriptionGroup.findUnique({ where: { id }, include: { owner: true }});
+    if (!group) throw new NotFoundException('Groupe non trouvé');
+    return group;
   }
 }
