@@ -8,64 +8,90 @@ datasource db {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
-  email         String    @unique
-  password_hash String?
-  name          String?
-  payments      Payment[]
-  avatar_url    String?
-  created_at    DateTime  @default(now())
-
-  // Stripe Connect
-  stripeAccountId String? @unique
-
-  // OAuth tokens (Spotify)
-  spotifyAccessToken  String?
-  spotifyRefreshToken String?
-  spotifyExpiresAt    DateTime?
-
-  subscriptions Subscription[]     @relation("OwnerSubscriptions")
-  memberOf      SubscriptionUser[]
+  id            String              @id @default(uuid())
+  name          String
+  email         String              @unique
+  phone         String
+  password      String
+  role          Role
+  kycStatus     KYCStatus           @default(PENDING)
+  wallet        Float               @default(0)
+  createdAt     DateTime            @default(now())
+  subscriptions SubscriptionGroup[] @relation("ownerGroups")
+  orders        Order[]             @relation("buyerOrders")
+  ownerOrders   Order[]             @relation("ownerOrders")
+  transactions  Transaction[]
 }
 
-model Subscription {
-  id            Int      @id @default(autoincrement())
-  ownerId       Int
-  owner         User     @relation("OwnerSubscriptions", fields: [ownerId], references: [id])
-  service_name  String
-  plan_name     String
-  price         Float
-  currency      String   @default("xaf")
-  max_users     Int
-  current_users Int      @default(1)
-  description   String?
-  status        String   @default("active")
-  created_at    DateTime @default(now())
-
-  users SubscriptionUser[]
+enum Role {
+  OWNER
+  BUYER
 }
 
-model SubscriptionUser {
-  id             Int          @id @default(autoincrement())
-  payments       Payment[]
-  subscriptionId Int
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
-  userId         Int
-  user           User         @relation(fields: [userId], references: [id])
-  joined_at      DateTime     @default(now())
-  role           String       @default("member")
+enum KYCStatus {
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
-model Payment {
-  id                 Int              @id @default(autoincrement())
-  subscriptionUserId Int
-  subscriptionUser   SubscriptionUser @relation(fields: [subscriptionUserId], references: [id])
-  amount             Float
-  currency           String           @default("xaf")
-  stripePaymentId    String?
-  stripeSessionId    String?
-  status             String           @default("pending")
-  created_at         DateTime         @default(now())
-  User               User?            @relation(fields: [userId], references: [id])
-  userId             Int?
+model SubscriptionGroup {
+  id             String   @id @default(uuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], name: "ownerGroups")
+  serviceName    String
+  plan           String
+  pricePerSlot   Float
+  totalSlots     Int
+  availableSlots Int
+  createdAt      DateTime @default(now())
+  orders         Order[]
+}
+
+model Order {
+  id                  String            @id @default(uuid())
+  subscriptionGroupId String
+  subscriptionGroup   SubscriptionGroup @relation(fields: [subscriptionGroupId], references: [id])
+  buyerId             String
+  buyer               User              @relation(fields: [buyerId], references: [id], name: "buyerOrders")
+  ownerId             String
+  owner               User              @relation(fields: [ownerId], references: [id], name: "ownerOrders")
+  amount              Float
+  commission          Float             @default(0)
+  status              OrderStatus       @default(PENDING)
+  buyerWhatsApp       String?
+  buyerWhatsAppLink   String?
+  paymentProviderId   String?
+  expiresAt           DateTime
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  Transaction         Transaction[]
+
+  @@index([status, expiresAt])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CONFIRMED
+  REFUNDED
+  CANCELLED
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  orderId   String?
+  order     Order?          @relation(fields: [orderId], references: [id])
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  type      TransactionType
+  amount    Float
+  metadata  Json?
+  createdAt DateTime        @default(now())
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+  COMMISSION
 }
