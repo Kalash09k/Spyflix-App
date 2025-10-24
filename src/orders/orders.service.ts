@@ -96,41 +96,33 @@ export class OrdersService {
   }
 
   // Webhook handler - payload dépend de CinetPay
-  async handleCinetPayWebhook(payload: any) {
-    // TODO: verify signature per CinetPay doc
-    const orderId = payload?.metadata?.orderId || payload?.orderId;
-    const transactionId = payload.transaction_id || payload.paymentId;
-    const status = payload.status || payload.transaction_status; // dépend de CinetPay payload
-
-    if (!orderId) {
-      this.logger.warn('Webhook sans orderId');
-      return;
-    }
-
+  async handleCinetPayWebhook({ orderId, transactionId, rawPayload }: { orderId: string; transactionId?: string; rawPayload?: any }) {
+    // Recherche commande
     const order = await this.prisma.order.findUnique({ where: { id: orderId }});
     if (!order) {
-      this.logger.warn(`Order ${orderId} not found for webhook`);
+      this.logger.warn(`Webhook: order ${orderId} introuvable`);
       return;
     }
-
-    if (order.status === 'PAID' || order.status === 'CONFIRMED') {
-      this.logger.log(`Webhook ignored (already paid/confirmed) for order ${orderId}`);
+  
+    // Idempotence : si déjà PAID or CONFIRMED ignore
+    if (['PAID', 'CONFIRMED'].includes(order.status)) {
+      this.logger.log(`Webhook: order ${orderId} déjà traité`);
       return;
     }
-
-    // Si paiement réussi
-    if (status === 'SUCCESS' || status === 'PAID' || status === 'COMPLETED') {
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'PAID', paymentProviderId: transactionId },
-      });
-
-      // Notifier owner via WhatsApp
-      await this.notifyOwnerPayment(orderId);
-    } else {
-      this.logger.warn(`Webhook status non-success for order ${orderId}: ${status}`);
-    }
-  }
+  
+    // Marquer comme PAID et sauvegarder id transac
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'PAID', paymentId: transactionId || rawPayload?.cpm_trans_id },
+    });
+  
+    await this.prisma.subscriptionGroup.update({ where: { id: order.subscriptionGroupId }, data: { availableSlots: { decrement: 1 } } });   // *******
+  
+    // Notifier le propriétaire via WhatsApp
+    await this.notifyOwnerPayment(orderId);
+  
+    this.logger.log(`Webhook processed: order ${orderId} marked PAID`);
+  }  
 
   // Notifier propriétaire via WhatsApp (WhatsAppCloud service)
   async notifyOwnerPayment(orderId: string) {

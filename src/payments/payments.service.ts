@@ -13,6 +13,29 @@ export class PaymentsService {
     customerPhone?: string;
   }) {
     const CINETPAY_URL = 'https://api-checkout.cinetpay.com/v2/payment';
+    const siteId = process.env.CINETPAY_SITE_ID;
+    const apiKey = process.env.CINETPAY_API_KEY;
+    const mockMode = process.env.PAYMENTS_MOCK_MODE === 'true';
+
+    if (mockMode || !siteId || !apiKey) {
+      const fakePaymentUrl = `https://fake-cinetpay.com/pay/${opts.orderId}`;
+      const fakePaymentId = `SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      this.logger.warn(
+        `⚠️ Mode simulation activé (aucun site_id ou apikey configuré). Paiement simulé pour ${opts.orderId}.`
+      );
+
+      return {
+        paymentUrl: fakePaymentUrl,
+        paymentId: fakePaymentId,
+        raw: {
+          simulated: true,
+          orderId: opts.orderId,
+          amount: opts.amount,
+          currency: opts.currency || 'XAF',
+        },
+      };
+    }
+
 
     const body = {
       amount: opts.amount,
@@ -33,12 +56,12 @@ export class PaymentsService {
     try {
       const response = await axios.post<any>(CINETPAY_URL, body, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 15000,
+        timeout: 30000,
       });
 
       const data: any = response.data;
 
-      
+
       if (data?.data?.payment_url || data?.payment_url) {
         const paymentUrl = data.data?.payment_url || data.payment_url;
         const paymentId = data.data?.transaction_id || data.transaction_id || null;
@@ -50,14 +73,14 @@ export class PaymentsService {
         return { paymentUrl, paymentId, raw: data };
       }
 
-      
+
       this.logger.error(
         `Réponse inattendue de CinetPay pour orderId=${opts.orderId}`,
         JSON.stringify(data, null, 2)
       );
       throw new BadRequestException("Impossible d'initialiser le paiement.");
     } catch (err: any) {
-     
+
       const isAxiosError = err?.isAxiosError || err?.response;
 
       if (isAxiosError) {
