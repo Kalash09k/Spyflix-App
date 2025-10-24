@@ -105,8 +105,8 @@ export class OrdersService {
     }
   
     // Idempotence : si déjà PAID or CONFIRMED ignore
-    if (order.status === 'PAID' || order.status === 'CONFIRMED') {
-      this.logger.log(`Webhook: order ${orderId} déjà en status ${order.status}, ignore.`);
+    if (['PAID', 'CONFIRMED'].includes(order.status)) {
+      this.logger.log(`Webhook: order ${orderId} déjà traité`);
       return;
     }
   
@@ -116,7 +116,7 @@ export class OrdersService {
       data: { status: 'PAID', paymentId: transactionId || rawPayload?.cpm_trans_id },
     });
   
-    await this.prisma.subscriptionGroup.update({ where: { id: order.groupId }, data: { availableSlots: { decrement: 1 } } });   // *******
+    await this.prisma.subscriptionGroup.update({ where: { id: order.subscriptionGroupId }, data: { availableSlots: { decrement: 1 } } });   // *******
   
     // Notifier le propriétaire via WhatsApp
     await this.notifyOwnerPayment(orderId);

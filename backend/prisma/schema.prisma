@@ -61,6 +61,7 @@ model Order {
   buyerWhatsApp       String?
   buyerWhatsAppLink   String?
   paymentProviderId   String?
+  paymentId           String?
   expiresAt           DateTime
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
